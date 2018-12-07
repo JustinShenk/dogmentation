@@ -317,7 +317,7 @@ def index():
             'field_in': [field_in],
             'field_out': [field_out],
             'out_img' : [out_img_filename],
-            'iou' : '0.01',
+            'iou' : 'NaN',
         }
         try:
             if os.path.exists(filename):
