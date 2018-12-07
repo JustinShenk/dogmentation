@@ -1,0 +1,10 @@
+wtforms
+flask
+uwsgi
+matplotlib
+pandas
+seaborn
+numpy
+requests
+fer
+Pillow

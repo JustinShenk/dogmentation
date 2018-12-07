@@ -1,0 +1,4 @@
+email,field_in,field_out,iou,name,out_img,timestamp,token,url,var_name
+shenkjustin@gmail.com,,,,Justin Shenk,0ec1975a-2e26-462f-b646-83fb994da927.png,2018-12-06 19:00:52.447665,,,
+tester@test.com,image,mask,0.0,Tester,c9055282-223d-4f34-9fd6-720a134dac07.png,2018-12-07 14:09:21.374900,Bearer ,,
+swagrin@swagverket.se,image,mask,0.0,Agrin Hilmkil,2cab9e84-7b62-4cc3-ab98-7739a0af0eec.png,2018-12-07 14:12:13.081629,Bearer e1da112c-5142-4809-a9ce-ea6c76fe6f73,https://a.peltarion.com/deployment/0ddb66e0-f484-4a5c-bfde-786dd5a5bab2/forward,
