@@ -250,9 +250,9 @@ def decode_image(data_uri: str):
 
 def compute_iou(test_results_list):
     predicted_mask = np.stack(np.array(decode_image(row[FIELD])) for row in test_results_list)
-    predicted_mask = np.sum(predicted_mask > 255 / 2, axis=-1)
+    predicted_mask = np.sum(predicted_mask, axis=-1) > 255 / 2
     true_mask = np.stack(np.array(mask) for mask in dataset[DATASET_MASK_COLUMN])
-    predicted_mask = predicted_mask > 255 / 2
+    true_mask = true_mask > 255 / 2
 
     intersection = np.logical_and(predicted_mask, true_mask)
     union = np.logical_or(predicted_mask, true_mask)
