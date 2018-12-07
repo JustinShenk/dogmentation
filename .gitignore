@@ -1,0 +1,7 @@
+.DS_Store
+.idea/
+config.cfg
+__pycache__/
+instance/
+video-demo-env/
+nginx.conf
