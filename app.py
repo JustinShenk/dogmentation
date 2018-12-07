@@ -224,6 +224,8 @@ def evaluate_test_dataset(url, authorization):
             {'image': encoded}
             for encoded in dataset['encoded'].iloc[i:(i + BATCH_SIZE)]
         ]}
+
+        app.logger.debug(f"Sending request to {url}")
         response = requests.post(
             url,
             headers={'Authorization': authorization},
