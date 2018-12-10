@@ -52,7 +52,9 @@
 </div>
 <div class="container">
     <h1>Dogmentation</h1>
-<p style="text-align:right"><img src="https://ih0.redbubble.net/image.368459420.3040/ap,550x550,12x16,1,transparent,t.u2.png" height="80"/></p>
+    <p style="text-align:right"><img
+            src="https://ih0.redbubble.net/image.368459420.3040/ap,550x550,12x16,1,transparent,t.u2.png" height="80"/>
+    </p>
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
@@ -70,57 +72,72 @@
     {% endwith %}
     <!-- The file upload form used as target for the file upload widget -->
     <div class="">
-    <form action="" method="post" role="form">
-        {{ form.csrf }}
-      <div class="form-group">
-        <label for="email">Email address</label>
-        <input type="email" class="form-control" id="email" name="email" aria-describedby="emailHelp" placeholder="Enter email">
-        <label for=name">Name</label>
-        <input type="text" class="form-control" id="name" name="name" placeholder="Name">
-        <label for="url">URL</label>
-        <input type="text" class="form-control" id="url" name="url" placeholder="Enter URL">
-        <label for="token">Token</label>
-        <input type="text" class="form-control" id="token" name="token" placeholder="Enter token">
-        <label for="field_in">Input Field</label>
-        <input type="text" class="form-control" id="field_in" name="field_in" placeholder="Enter input field name (eg, 'image')"/>
-        <label for="field_out">Output Field</label>
-        <input type="text" class="form-control" id="field_out" name="field_out" placeholder="Enter out field name (eg, 'mask')"/>
-      </div>
-      <button type="submit" class="btn btn-success">Submit</button>
-    </form>
-        {% if results %}
-            <table role="presentation" class="table table-striped">
+        <form action="" method="post" role="form">
+            {{ form.csrf }}
+            <div class="form-group">
+                <label for="email">Email address</label>
+                <input type="email" class="form-control" id="email" name="email" aria-describedby="emailHelp"
+                       placeholder="Enter email">
+                <label for=name">Name</label>
+                <input type="text" class="form-control" id="name" name="name" placeholder="Name">
+                <label for="url">URL</label>
+                <input type="text" class="form-control" id="url" name="url" placeholder="Enter URL">
+                <label for="token">Token</label>
+                <input type="text" class="form-control" id="token" name="token" placeholder="Enter token">
+                <label for="field_in">Input Field</label>
+                <input type="text" class="form-control" id="field_in" name="field_in"
+                       placeholder="Enter input field name (eg, 'image')"/>
+                <label for="field_out">Output Field</label>
+                <input type="text" class="form-control" id="field_out" name="field_out"
+                       placeholder="Enter out field name (eg, 'mask')"/>
+            </div>
+            <button type="submit" class="btn btn-success">Submit</button>
+        </form>
+            <table role="presentation" class="table table-striped" id="leaderboardTable">
                 <tbody class="files" style="background-color:gray">
+                <tr>
+                    <th onclick="sortTable(0)">Timestamp</th>
+                    <th onclick="sortTable(1)">Name</th>
+                    <th onclick="sortTable(2)">Test IoU</th>
+                    <th>Result</th>
+                    <th></th>
+                </tr>
                 {% for result in results %}
                     {% if loop.index is even %}
                         <tr class="" style="background-color: #E0E0E0">
-                    {% else %}
+                            {% else %}
                         <tr style="background-color: white">
                     {% endif %}
-                        <td>
-                        <span class="name">
-                        {% if loop.index == 1 %}
-                        FIRST:
-                            {% endif %}
-                        {{ result.name}}
-                        </span>
-                        </td>
-                        <td>
-                            <span class="preview">{{ result.iou }}</span>
-                        </td>
-                        <td>
-                            <span class="preview"><img src="/uploads/{{result.out_img}}"/></span>
-                        </td>
-                        <td>
-                        <button id="button{{ loop.index }}" class="btn btn-warning cancel glyphicon glyphicon-ban-circle" disabled=true type="reset">
+                    <td>
+                    <span class="timestamp">
+                        {{ result.timestamp }}
+                    </span>
+                    </td>
+                    <td>
+                    <span class="name">
+                    {% if loop.index == 1 %}
+                        <span id="leaderSpan"></span>
+                    {% endif %}
+                        {{ result.name }}
+                    </span>
+                    </td>
+                    <td>
+                        <span class="preview">{{ result.iou }}</span>
+                    </td>
+                    <td>
+                        <span class="preview"><img src="/uploads/{{ result.out_img }}"/></span>
+                    </td>
+                    <td>
+                        <button id="button{{ loop.index }}" class="btn btn-warning cancel glyphicon glyphicon-ban-circle"
+                                disabled=true type="reset">
                         </button>
-                        </td>
-                        </tr>
+                    </td>
+                    </tr>
                 {% endfor %}
+
                 </tbody>
             </table>
-        {% endif %}
-{#        </div>#}
+        {#        </div>#}
     </div>
 
     <br>
@@ -136,14 +153,70 @@
 <!-- The main application script -->
 {#<script src="{{ url_for('static',filename='js/main.js') }}"></script>#}
 <script>
-$("button.cancel").click(function() {
-    // Get row number from button
-    var id = this.id.split('button').pop();
-    // Convert to zero-indexing for Pandas
-    var row_idx = parseInt(id) - 1;
+    $("button.cancel").click(function () {
+        // Get row number from button
+        var id = this.id.split('button').pop();
+        // Convert to zero-indexing for Pandas
+        var row_idx = parseInt(id) - 1;
 
-    window.location.href= '/remove' + '/' + row_idx;
-});
+        window.location.href = '/remove' + '/' + row_idx;
+    });
+
+    function sortTable(n) {
+      var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+      table = document.getElementById("leaderboardTable");
+      switching = true;
+      // Set the sorting direction to ascending:
+      dir = "asc";
+      /* Make a loop that will continue until
+      no switching has been done: */
+      while (switching) {
+        // Start by saying: no switching is done:
+        switching = false;
+        rows = table.rows;
+        /* Loop through all table rows (except the
+        first, which contains table headers): */
+        for (i = 1; i < (rows.length - 1); i++) {
+          // Start by saying there should be no switching:
+          shouldSwitch = false;
+          /* Get the two elements you want to compare,
+          one from current row and one from the next: */
+          x = rows[i].getElementsByTagName("TD")[n];
+          y = rows[i + 1].getElementsByTagName("TD")[n];
+          /* Check if the two rows should switch place,
+          based on the direction, asc or desc: */
+          if (dir == "asc") {
+            if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+              // If so, mark as a switch and break the loop:
+              shouldSwitch = true;
+              break;
+            }
+          } else if (dir == "desc") {
+            if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+              // If so, mark as a switch and break the loop:
+              shouldSwitch = true;
+              break;
+            }
+          }
+        }
+        if (shouldSwitch) {
+          /* If a switch has been marked, make the switch
+          and mark that a switch has been done: */
+          rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+          switching = true;
+          // Each time a switch is done, increase this count by 1:
+          switchcount ++;
+        } else {
+          /* If no switching has been done AND the direction is "asc",
+          set the direction to "desc" and run the while loop again. */
+          if (switchcount == 0 && dir == "asc") {
+            dir = "desc";
+            switching = true;
+          }
+        }
+      }
+    }
+
 </script>
 <!-- The XDomainRequest Transport is included for cross-domain file deletion for IE 8 and IE 9 -->
 <!--[if (gte IE 8)&(lt IE 10)]>
