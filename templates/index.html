@@ -72,7 +72,7 @@
     {% endwith %}
     <!-- The file upload form used as target for the file upload widget -->
     <div class="">
-        <form action="" method="post" role="form">
+        <form action="" method="post" role="form" enctype = "multipart/form-data">
             {{ form.csrf }}
             <div class="form-group">
                 <label for="email">Email address</label>
@@ -90,6 +90,8 @@
                 <label for="field_out">Output Field</label>
                 <input type="text" class="form-control" id="field_out" name="field_out"
                        placeholder="Enter out field name (eg, 'mask')"/>
+                 <label for="model_file">Keras H5 file (optional, replaces URL and Token if uploaded)</label>
+                <input type="file" class="form-control-file" id="model_file" name="model_file">
             </div>
             <button type="submit" class="btn btn-success">Submit</button>
         </form>

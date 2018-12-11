@@ -1,10 +1,12 @@
 import base64
 import glob
 import logging
+import multiprocessing
 import sys
 import uuid
 import zipfile
 
+import tensorflow.keras as keras
 from wtforms import Form, TextField, TextAreaField, validators, StringField, SubmitField
 
 import matplotlib
@@ -20,6 +22,9 @@ import requests
 import seaborn as sns
 import shutil
 import tempfile
+
+from werkzeug.utils import secure_filename
+
 
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, session, \
     make_response, jsonify, Response
@@ -209,7 +214,42 @@ def overlay_mask(img_path: str, mask: Image):
     overlayed_img = Image.blend(img, mask, alpha=.5)
     return overlayed_img
 
-def evaluate_test_dataset(url, authorization):
+
+
+def test_model(data, model_filename):
+    """Test model at `model_filename` on encoded_images in `data`."""
+    # Data is list of {'image': encoded_image}
+    model_path = to_uploads(model_filename)
+    import ipdb;ipdb.set_trace()
+
+    test_images = [decode_image(x['image']) for x in data['rows']]
+    test_images = np.stack(map(np.array, test_images))
+    test_images = test_images.astype(np.float32) / 255
+    test_images = test_images[..., ::-1]  # BGR
+
+    # Get 0-1 scaled predictions
+
+    with multiprocessing.Pool() as pool:
+        predictions = pool.starmap(model_inference, [(model_path, test_images)])[0]
+    import ipdb; ipdb.set_trace()
+    results = [{'mask': encode_image(Image.fromarray((mask * 255).astype('uint8').reshape(128, 128))) for mask in
+                predictions}]
+    return results
+
+
+def model_inference(model_path, test_images):
+    # import ipdb;ipdb.set_trace()
+    keras.backend.clear_session()
+    predictions = []
+    # with tf.Session(graph=tf.Graph()) as sess:
+    #     K.set_session(sess)
+    model = keras.models.load_model(model_path, compile=False)
+    model.compile(loss=keras.losses.binary_crossentropy, optimizer=keras.optimizers.Adam())
+    predictions = model.predict(test_images)
+    return predictions
+
+
+def evaluate_test_dataset(url, authorization, model_filename):
     """Return list `rows` with responses for test `dataset`."""
     dataset['encoded'] = dataset[DATASET_IMAGE_COLUMN].apply(encode_image)
 
@@ -219,20 +259,26 @@ def evaluate_test_dataset(url, authorization):
         authorization= AUTHORIZATION
 
     rows = []
+
     for i in range(0, len(dataset), BATCH_SIZE):
         data = {'rows': [
             {'image': encoded}
             for encoded in dataset['encoded'].iloc[i:(i + BATCH_SIZE)]
         ]}
 
-        app.logger.debug(f"Sending request to {url}")
-        response = requests.post(
-            url,
-            headers={'Authorization': authorization},
-            json=data
-        )
-        rows.extend(response.json()['rows'])
+        if model_filename is not '':
+            results = test_model(data, model_filename)
+            rows.extend(results)
+        else:
+            app.logger.debug(f"Sending request to {url}")
+            response = requests.post(
+                url,
+                headers={'Authorization': authorization},
+                json=data
+            )
+            rows.extend(response.json()['rows'])
     return rows
+
 
 def encode_image(image: Image):
     image_bytes = io.BytesIO()
@@ -250,10 +296,16 @@ def decode_image(data_uri: str):
         image.load()
         return image
 
-def compute_iou(test_results_list):
-    predicted_mask = np.stack(np.array(decode_image(row[FIELD])) for row in test_results_list)
-    predicted_mask = np.sum(predicted_mask, axis=-1) > 255 / 2
-    true_mask = np.stack(np.array(mask) for mask in dataset[DATASET_MASK_COLUMN])
+
+def compute_iou(test_results_list, field_out):
+
+    predicted_mask = np.stack(np.array(decode_image(row[field_out])).reshape(128, 128, 1) for row in test_results_list)
+    # Make boolean mask, sum over channels
+    if predicted_mask.shape[-1] == 3:
+        predicted_mask = np.sum(predicted_mask, axis=-1)
+    predicted_mask = predicted_mask > 255 / 2
+    img_count = len(predicted_mask)
+    true_mask = np.stack(np.array(mask) for mask in dataset[DATASET_MASK_COLUMN][:img_count])
     true_mask = true_mask > 255 / 2
 
     intersection = np.logical_and(predicted_mask, true_mask)
@@ -269,12 +321,14 @@ def token_to_auth(token):
     else:
         return 'Bearer ' + token
 
+
 def save_img(img: Image):
-    """"""
+    """Decode and save `img` to `uploads` directory."""
     img_path = str(uuid.uuid4())+'.png'
     img = decode_image(img)
     img.save(to_uploads(img_path))
     return img_path
+
 
 def get_sample_overlay(test_results_list):
     """Return `out_img_filename` from list of dicts `test_results`."""
@@ -286,26 +340,41 @@ def get_sample_overlay(test_results_list):
     overlay_img.save(to_uploads(out_img_path))
     return out_img_path
 
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ['h5','H5']
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     filename = to_uploads('data.csv')
     form = []
     results = []
+    model_filename = ''
 
     # results = get_results()
     if request.method == 'POST':
+        # Get form inputs
         form = ReusableForm(request.form)
         print(form.errors)
         name = request.form['name']
         if name is '':
-            name = 'Anyonmous'
+            name = 'Anonymous'
         email = request.form['email'].lower()
         url = request.form['url']
         auth = token_to_auth(request.form['token'])
         field_in = request.form['field_in'] or 'image'
         field_out = request.form['field_out'] or 'mask'
+        file = request.files.get('model_file')
+        if file and allowed_file(file.filename):
+            model_filename = str(uuid.uuid4())[:8] + secure_filename(file.filename)
+            file.save(to_uploads(model_filename))
+            url = model_filename # HACK
         # out_img_filename = find_dogs(url, auth, var_name, debug=True)
-        test_results_list = evaluate_test_dataset(url, auth)
+        # import ipdb;ipdb.set_trace()
+        test_results_list = evaluate_test_dataset(url, auth, model_filename=model_filename)
+
         out_img_filename = get_sample_overlay(test_results_list)
 
         data = {
@@ -321,7 +390,7 @@ def index():
         }
         try:
             if os.path.exists(filename):
-                data['iou'] = compute_iou(test_results_list)
+                data['iou'] = compute_iou(test_results_list, field_out)
                 data['out_img'] = out_img_filename
                 df = pd.read_csv(filename)
                 df = df.append(pd.DataFrame(data, columns=[*data]))
@@ -347,10 +416,10 @@ def index():
             app.logger.error("File not found")
         except TypeError:
             pass
-    # import ipdb;ipdb.set_trace()
     print(results)
 
     return render_template('index.html', form=form, results=results)
+
 
 def to_records(df, sortby=None):
     """Output `df` as dict-like `records` sorted by `sortby`."""
@@ -359,6 +428,7 @@ def to_records(df, sortby=None):
 
     results = df.to_dict('records')
     return results
+
 
 @app.after_request
 def add_header(response):
