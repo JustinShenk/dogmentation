@@ -56,7 +56,7 @@ sns.set()
 DATASET_PATH = 'dogmentation_val.zip'
 DATASET_IMAGE_COLUMN = 'image'
 DATASET_MASK_COLUMN = 'mask'
-BATCH_SIZE = 16
+BATCH_SIZE = 30
 
 AUTHORIZATION = app.config.get('AUTHORIZATION')
 URL = app.config.get('URL')
