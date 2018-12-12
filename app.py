@@ -56,7 +56,7 @@ sns.set()
 DATASET_PATH = 'dogmentation_val.zip'
 DATASET_IMAGE_COLUMN = 'image'
 DATASET_MASK_COLUMN = 'mask'
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 
 AUTHORIZATION = app.config.get('AUTHORIZATION')
 URL = app.config.get('URL')
@@ -367,13 +367,15 @@ def get_sample_overlay(test_results_list):
     except:
         # TODO: Refactor
         mask = test_results_list[0]
-    img = dataset.loc[0, 'encoded']
-    img_path = save_img(img)
+
+    # TODO: Remove unused code
+    # img = dataset.loc[0, 'encoded']
+    # img_path = save_img(img)
 
     test_results_list = np.stack(test_results_list[:3])
 
     predicted_masks = test_results_list > 0.5
-    import ipdb;ipdb.set_trace()
+
     comparison_image = Image.fromarray(np.concatenate([
         np.concatenate([np.array(image) for image in dataset.loc[:2, DATASET_IMAGE_COLUMN]]),
         np.concatenate([np.array(mask.convert('RGB')) for mask in dataset.loc[:2, DATASET_MASK_COLUMN]]),
