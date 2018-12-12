@@ -56,7 +56,7 @@ sns.set()
 DATASET_PATH = 'dogmentation_val.zip'
 DATASET_IMAGE_COLUMN = 'image'
 DATASET_MASK_COLUMN = 'mask'
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 
 AUTHORIZATION = app.config.get('AUTHORIZATION')
 URL = app.config.get('URL')
@@ -64,7 +64,7 @@ FIELD = 'mask'
 
 with zipfile.ZipFile(DATASET_PATH, 'r') as z:
     index_file = z.open('index.csv')
-    dataset = pd.read_csv(index_file)[:16]
+    dataset = pd.read_csv(index_file)[:BATCH_SIZE]
     dataset[DATASET_IMAGE_COLUMN] = dataset[DATASET_IMAGE_COLUMN].apply(
         lambda path: Image.open(z.open(path)))
     dataset[DATASET_MASK_COLUMN] = dataset[DATASET_MASK_COLUMN].apply(
@@ -223,6 +223,9 @@ def overlay_mask(img_path: str, mask):
         mask = decode_image(mask)
     mask = mask.convert("RGBA")
     overlayed_img = Image.blend(img, mask, alpha=.5)
+
+
+
     return overlayed_img
 
 
@@ -350,7 +353,8 @@ def token_to_auth(token):
 def save_img(img: Image):
     """Decode and save `img` to `uploads` directory."""
     img_path = str(uuid.uuid4()) + '.png'
-    img = decode_image(img)
+    if isinstance(img, str):
+        img = decode_image(img)
     img.save(to_uploads(img_path))
     return img_path
 
@@ -365,9 +369,24 @@ def get_sample_overlay(test_results_list):
         mask = test_results_list[0]
     img = dataset.loc[0, 'encoded']
     img_path = save_img(img)
-    overlay_img = overlay_mask(img_path, mask)
-    out_img_path = str(uuid.uuid4()) + '.png'
-    overlay_img.save(to_uploads(out_img_path))
+
+    test_results_list = np.stack(test_results_list[:3])
+
+    predicted_masks = test_results_list > 0.5
+    import ipdb;ipdb.set_trace()
+    comparison_image = Image.fromarray(np.concatenate([
+        np.concatenate([np.array(image) for image in dataset.loc[:2, DATASET_IMAGE_COLUMN]]),
+        np.concatenate([np.array(mask.convert('RGB')) for mask in dataset.loc[:2, DATASET_MASK_COLUMN]]),
+        np.concatenate(np.tile(test_results_list, (1, 1, 1, 3)) * 255).astype('uint8'),
+        np.concatenate(np.tile(predicted_masks, (1, 1, 1, 3)) * 255).astype('uint8')
+    ],
+        axis=1
+    ))
+
+    # overlay_img = overlay_mask(img_path, mask)
+    out_img_path = save_img(comparison_image)
+    # out_img_path = str(uuid.uuid4()) + '.png'
+    # overlay_img.save(to_uploads(out_img_path))
     return out_img_path
 
 
