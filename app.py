@@ -382,8 +382,12 @@ def index():
         if name is '':
             name = 'Anonymous'
         email = request.form['email'].lower()
-        url = request.form['url']
-        auth = token_to_auth(request.form['token'])
+        try:
+            url = request.form['url']
+            auth = token_to_auth(request.form['token'])
+        except:
+            url = ''
+            auth = ''
         field_in = request.form['field_in'] or 'image'
         field_out = request.form['field_out'] or 'mask'
         is_bgr = request.form.get('bgr_check')
