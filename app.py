@@ -66,11 +66,9 @@ with zipfile.ZipFile(DATASET_PATH, 'r') as z:
     index_file = z.open('index.csv')
     dataset = pd.read_csv(index_file)[:16]
     dataset[DATASET_IMAGE_COLUMN] = dataset[DATASET_IMAGE_COLUMN].apply(
-        lambda path: Image.open(z.open(path))
-    )
+        lambda path: Image.open(z.open(path)))
     dataset[DATASET_MASK_COLUMN] = dataset[DATASET_MASK_COLUMN].apply(
-        lambda path: Image.open(z.open(path))
-    )
+        lambda path: Image.open(z.open(path)))
 
 
 def to_uploads(filename):
@@ -167,18 +165,23 @@ def remove(row_idx):
         print(f"No index {row_idx} found in data.csv")
     return redirect('/', code=302)
 
+
 @app.route('/backup_db')
 def backup_db():
     from shutil import copyfile
-    backup_filename = str(uuid.uuid4())+'.csv'
-    copyfile(to_uploads('data.csv'), os.path.join(app.static_folder, backup_filename))
+    backup_filename = str(uuid.uuid4()) + '.csv'
+    copyfile(
+        to_uploads('data.csv'), os.path.join(app.static_folder,
+                                             backup_filename))
     return redirect('/', code=302)
+
 
 def pil_to_bytearray(pil_img):
     img_byte_arr = io.BytesIO()
     pil_img.save(img_byte_arr, format='PNG')
     img_byte_arr = img_byte_arr.getvalue()
     return img_byte_arr
+
 
 def find_dogs(url, token, var_name, dog_image=DOG_IMAGE, debug=False):
     """Find dogs, returns PIL Image `out_img`."""
@@ -187,11 +190,12 @@ def find_dogs(url, token, var_name, dog_image=DOG_IMAGE, debug=False):
     # if debug:
     # out_mask = Image.open(DOG_MASK)
     # else:
-    out_mask = web_inference(test_dog, url, token,var_name)
+    out_mask = web_inference(test_dog, url, token, var_name)
     out_img = overlay_mask(dog_image, out_mask)
     out_img_filename = str(uuid.uuid4()) + '.png'
     out_img.save(to_uploads(out_img_filename))
     return out_img_filename
+
 
 def web_inference(dog_image, url, token, var_name):
     """Run inference on dog_image, return grayscale PNG `out_mask`."""
@@ -205,6 +209,7 @@ def web_inference(dog_image, url, token, var_name):
     # TODO: Convert to PIL for overlaying
     return out_mask
 
+
 def overlay_mask(img_path: str, mask):
     """Return `overlayed_img`"""
     # Get test image
@@ -212,14 +217,13 @@ def overlay_mask(img_path: str, mask):
     img = img.convert("RGBA")
     if not isinstance(mask, Image.Image):
         # Conver to Image
-        mask_int = (mask*255).astype('uint8').reshape(128,128)
+        mask_int = (mask * 255).astype('uint8').reshape(128, 128)
         mask = Image.fromarray(mask_int)
     else:
         mask = decode_image(mask)
     mask = mask.convert("RGBA")
     overlayed_img = Image.blend(img, mask, alpha=.5)
     return overlayed_img
-
 
 
 def test_model(data, model_filename, is_bgr):
@@ -234,13 +238,15 @@ def test_model(data, model_filename, is_bgr):
         test_images = [x['image'] for x in data['rows']]
     test_images = np.stack(map(np.array, test_images))
     test_images = test_images.astype(np.float32) / 255
+
     if is_bgr:
         test_images = test_images[..., ::-1]  # BGR
 
     # Get 0-1 scaled predictions
 
     with multiprocessing.Pool() as pool:
-        predictions = pool.starmap(model_inference, [(model_path, test_images)])[0]
+        predictions = pool.starmap(model_inference,
+                                   [(model_path, test_images)])[0]
 
     return predictions
 
@@ -252,7 +258,9 @@ def model_inference(model_path, test_images):
     # with tf.Session(graph=tf.Graph()) as sess:
     #     K.set_session(sess)
     model = keras.models.load_model(model_path, compile=False)
-    model.compile(loss=keras.losses.binary_crossentropy, optimizer=keras.optimizers.Adam())
+    model.compile(
+        loss=keras.losses.binary_crossentropy,
+        optimizer=keras.optimizers.Adam())
     predictions = model.predict(test_images)
     return predictions
 
@@ -264,15 +272,16 @@ def evaluate_test_dataset(url, authorization, model_filename, is_bgr):
     if 'http' not in url:
         url = URL
     if len(authorization) < 10:
-        authorization= AUTHORIZATION
+        authorization = AUTHORIZATION
 
     rows = []
 
     for i in range(0, len(dataset), BATCH_SIZE):
-        data = {'rows': [
-            {'image': encoded}
-            for encoded in dataset['encoded'].iloc[i:(i + BATCH_SIZE)]
-        ]}
+        data = {
+            'rows': [{
+                'image': encoded
+            } for encoded in dataset['encoded'].iloc[i:(i + BATCH_SIZE)]]
+        }
 
         if model_filename is not '':
             predictions_arr = test_model(data, model_filename, is_bgr)
@@ -280,10 +289,7 @@ def evaluate_test_dataset(url, authorization, model_filename, is_bgr):
         else:
             app.logger.debug(f"Sending request to {url}")
             response = requests.post(
-                url,
-                headers={'Authorization': authorization},
-                json=data
-            )
+                url, headers={'Authorization': authorization}, json=data)
             predictions = [x['mask'] for x in response.json()['rows']]
             rows.extend(predictions)
     return rows
@@ -293,7 +299,8 @@ def encode_image(image: Image):
     """Convert PIL Image `image` to base64 encoded image."""
     image_bytes = io.BytesIO()
     image.save(image_bytes, format='png')
-    return 'data:image/png;base64,' + base64.b64encode(image_bytes.getvalue()).decode()
+    return 'data:image/png;base64,' + base64.b64encode(
+        image_bytes.getvalue()).decode()
 
 
 def decode_image(data_uri: str):
@@ -313,14 +320,16 @@ def compute_iou(test_results_list, field_out):
         # TODO: Handle API calls and catch errors
         test = test_results_list[0][field_out]
         predicted_mask = np.stack(
-            np.array(decode_image(row[field_out])).reshape(128, 128) for row in test_results_list)
+            np.array(decode_image(row[field_out])).reshape(128, 128)
+            for row in test_results_list)
     except IndexError:
         predicted_mask = np.stack(
             (pred).reshape(128, 128) for pred in test_results_list)
 
     predicted_mask = predicted_mask > 0.5
     img_count = len(predicted_mask)
-    true_mask = np.stack(np.array(mask) for mask in dataset[DATASET_MASK_COLUMN][:img_count])
+    true_mask = np.stack(
+        np.array(mask) for mask in dataset[DATASET_MASK_COLUMN][:img_count])
     true_mask = true_mask > 255 / 2
 
     intersection = np.logical_and(predicted_mask, true_mask)
@@ -329,6 +338,7 @@ def compute_iou(test_results_list, field_out):
 
     print('IoU', iou_score)
     return iou_score
+
 
 def token_to_auth(token):
     if 'bearer' in token.lower():
@@ -339,7 +349,7 @@ def token_to_auth(token):
 
 def save_img(img: Image):
     """Decode and save `img` to `uploads` directory."""
-    img_path = str(uuid.uuid4())+'.png'
+    img_path = str(uuid.uuid4()) + '.png'
     img = decode_image(img)
     img.save(to_uploads(img_path))
     return img_path
@@ -353,10 +363,10 @@ def get_sample_overlay(test_results_list):
     except:
         # TODO: Refactor
         mask = test_results_list[0]
-    img = dataset.loc[0,'encoded']
+    img = dataset.loc[0, 'encoded']
     img_path = save_img(img)
     overlay_img = overlay_mask(img_path, mask)
-    out_img_path = str(uuid.uuid4())+'.png'
+    out_img_path = str(uuid.uuid4()) + '.png'
     overlay_img.save(to_uploads(out_img_path))
     return out_img_path
 
@@ -390,14 +400,17 @@ def index():
             auth = ''
         field_in = request.form['field_in'] or 'image'
         field_out = request.form['field_out'] or 'mask'
-        is_bgr = request.form.get('bgr_check')
+
+        is_bgr = request.form.get('bgr_check') != None
         file = request.files.get('model_file')
         if file and allowed_file(file.filename):
-            model_filename = str(uuid.uuid4())[:8] + secure_filename(file.filename)
+            model_filename = str(uuid.uuid4())[:8] + secure_filename(
+                file.filename)
             file.save(to_uploads(model_filename))
-            url = model_filename # HACK for saving model path
+            url = model_filename  # HACK for saving model path
         # out_img_filename = find_dogs(url, auth, var_name, debug=True)
-        test_results_list = evaluate_test_dataset(url, auth, model_filename=model_filename, is_bgr=is_bgr)
+        test_results_list = evaluate_test_dataset(
+            url, auth, model_filename=model_filename, is_bgr=is_bgr)
 
         out_img_filename = get_sample_overlay(test_results_list)
 
@@ -409,8 +422,8 @@ def index():
             'token': [auth],
             'field_in': [field_in],
             'field_out': [field_out],
-            'out_img' : [out_img_filename],
-            'iou' : 'NaN',
+            'out_img': [out_img_filename],
+            'iou': 'NaN',
         }
         try:
             if os.path.exists(filename):
@@ -423,9 +436,8 @@ def index():
                 data['out_img'] = out_img_filename
                 df = pd.DataFrame(data, columns=[*data])
 
-
             # Overwrite csv
-            df.to_csv(filename,index=False)
+            df.to_csv(filename, index=False)
             session['dataframe'] = df.to_html(
                 # float_format=lambda x: '%.2f' % x,
                 classes='mystyle')
