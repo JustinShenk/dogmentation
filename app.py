@@ -205,11 +205,17 @@ def web_inference(dog_image, url, token, var_name):
     # TODO: Convert to PIL for overlaying
     return out_mask
 
-def overlay_mask(img_path: str, mask: Image):
-    """Return Image"""
+def overlay_mask(img_path: str, mask):
+    """Return `overlayed_img`"""
+    # Get test image
     img = Image.open(to_uploads(img_path))
     img = img.convert("RGBA")
-    mask = decode_image(mask)
+    if not isinstance(mask, Image.Image):
+        # Conver to Image
+        mask_int = (mask*255).astype('uint8').reshape(128,128)
+        mask = Image.fromarray(mask_int)
+    else:
+        mask = decode_image(mask)
     mask = mask.convert("RGBA")
     overlayed_img = Image.blend(img, mask, alpha=.5)
     return overlayed_img
@@ -217,12 +223,15 @@ def overlay_mask(img_path: str, mask: Image):
 
 
 def test_model(data, model_filename, is_bgr):
-    """Test model at `model_filename` on encoded_images in `data`."""
+    """Test model at `model_filename` on PIL Images in `data`, return FP32 array."""
     # Data is list of {'image': encoded_image}
     model_path = to_uploads(model_filename)
 
-
-    test_images = [decode_image(x['image']) for x in data['rows']]
+    if isinstance(data.get('rows')[0].get('image'), str):
+        test_images = [decode_image(x['image']) for x in data['rows']]
+    elif isinstance(data.get('rows')[0].get('image'), Image.Image):
+        # Is already encoded
+        test_images = [x['image'] for x in data['rows']]
     test_images = np.stack(map(np.array, test_images))
     test_images = test_images.astype(np.float32) / 255
     if is_bgr:
@@ -233,13 +242,11 @@ def test_model(data, model_filename, is_bgr):
     with multiprocessing.Pool() as pool:
         predictions = pool.starmap(model_inference, [(model_path, test_images)])[0]
 
-    results = [{'mask': encode_image(Image.fromarray((mask * 255).astype('uint8').reshape(128, 128))) for mask in
-                predictions}]
-    return results
+    return predictions
 
 
 def model_inference(model_path, test_images):
-    # import ipdb;ipdb.set_trace()
+
     keras.backend.clear_session()
     predictions = []
     # with tf.Session(graph=tf.Graph()) as sess:
@@ -251,7 +258,7 @@ def model_inference(model_path, test_images):
 
 
 def evaluate_test_dataset(url, authorization, model_filename, is_bgr):
-    """Return list `rows` with responses for test `dataset`."""
+    """Return list of encoded images `rows` with responses for test `dataset`."""
     dataset['encoded'] = dataset[DATASET_IMAGE_COLUMN].apply(encode_image)
 
     if 'http' not in url:
@@ -268,8 +275,8 @@ def evaluate_test_dataset(url, authorization, model_filename, is_bgr):
         ]}
 
         if model_filename is not '':
-            results = test_model(data, model_filename, is_bgr)
-            rows.extend(results)
+            predictions_arr = test_model(data, model_filename, is_bgr)
+            rows.extend(predictions_arr)
         else:
             app.logger.debug(f"Sending request to {url}")
             response = requests.post(
@@ -277,11 +284,13 @@ def evaluate_test_dataset(url, authorization, model_filename, is_bgr):
                 headers={'Authorization': authorization},
                 json=data
             )
-            rows.extend(response.json()['rows'])
+            predictions = [x['mask'] for x in response.json()['rows']]
+            rows.extend(predictions)
     return rows
 
 
 def encode_image(image: Image):
+    """Convert PIL Image `image` to base64 encoded image."""
     image_bytes = io.BytesIO()
     image.save(image_bytes, format='png')
     return 'data:image/png;base64,' + base64.b64encode(image_bytes.getvalue()).decode()
@@ -299,12 +308,17 @@ def decode_image(data_uri: str):
 
 
 def compute_iou(test_results_list, field_out):
+    """Compute IoU for `test_results_list`."""
+    try:
+        # TODO: Handle API calls and catch errors
+        test = test_results_list[0][field_out]
+        predicted_mask = np.stack(
+            np.array(decode_image(row[field_out])).reshape(128, 128) for row in test_results_list)
+    except IndexError:
+        predicted_mask = np.stack(
+            (pred).reshape(128, 128) for pred in test_results_list)
 
-    predicted_mask = np.stack(np.array(decode_image(row[field_out])).reshape(128, 128, 1) for row in test_results_list)
-    # Make boolean mask, sum over channels
-    if predicted_mask.shape[-1] == 3:
-        predicted_mask = np.sum(predicted_mask, axis=-1)
-    predicted_mask = predicted_mask > 255 / 2
+    predicted_mask = predicted_mask > 0.5
     img_count = len(predicted_mask)
     true_mask = np.stack(np.array(mask) for mask in dataset[DATASET_MASK_COLUMN][:img_count])
     true_mask = true_mask > 255 / 2
@@ -333,7 +347,12 @@ def save_img(img: Image):
 
 def get_sample_overlay(test_results_list):
     """Return `out_img_filename` from list of dicts `test_results`."""
-    mask = test_results_list[0][FIELD]
+    try:
+        # Original API implemtnation
+        mask = test_results_list[0][FIELD]
+    except:
+        # TODO: Refactor
+        mask = test_results_list[0]
     img = dataset.loc[0,'encoded']
     img_path = save_img(img)
     overlay_img = overlay_mask(img_path, mask)
@@ -372,7 +391,7 @@ def index():
         if file and allowed_file(file.filename):
             model_filename = str(uuid.uuid4())[:8] + secure_filename(file.filename)
             file.save(to_uploads(model_filename))
-            url = model_filename # HACK
+            url = model_filename # HACK for saving model path
         # out_img_filename = find_dogs(url, auth, var_name, debug=True)
         test_results_list = evaluate_test_dataset(url, auth, model_filename=model_filename, is_bgr=is_bgr)
 
