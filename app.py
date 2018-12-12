@@ -48,7 +48,7 @@ app.secret_key = 'dogfooding'
 
 UPLOAD_FOLDER = os.path.join(app.instance_path, 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024  # 30 MB limit
+app.config['MAX_CONTENT_LENGTH'] = 400 * 1024 * 1024  # 30 MB limit
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 sns.set()
