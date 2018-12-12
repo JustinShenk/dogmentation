@@ -90,11 +90,18 @@
                 <label for="field_out">Output Field</label>
                 <input type="text" class="form-control" id="field_out" name="field_out"
                        placeholder="Enter out field name (eg, 'mask')"/>
-                 <label for="model_file">Keras H5 file (optional, replaces URL and Token if uploaded)</label>
+                <label for="model_file">Keras H5 file (optional, replaces URL and Token if uploaded)</label>
                 <input type="file" class="form-control-file" id="model_file" name="model_file">
+                <input class="form-check-input" type="checkbox" value="" id="bgr_check" name="bgr_check" checked>
+                <label class="form-check-label" for="bgr_check">
+                    BGR channel order (Platform default)
+                </label>
             </div>
-            <button type="submit" class="btn btn-success">Submit</button>
+            <button disabled class="btn btn-primary" type=button id="waitingButton" style="display: none">
+                Uploading and Testing</button>
+            <button id="submitButton" type="submit" class="btn btn-primary">Submit</button>
         </form>
+    <br>
             <table role="presentation" class="table table-striped" id="leaderboardTable">
                 <tbody class="files" style="background-color:gray">
                 <tr>
@@ -219,6 +226,10 @@
       }
     }
 
+    $("#submitButton").click(function() {
+        $("#submitButton").hide();
+        $("#waitingButton").show();
+    });
 </script>
 <!-- The XDomainRequest Transport is included for cross-domain file deletion for IE 8 and IE 9 -->
 <!--[if (gte IE 8)&(lt IE 10)]>

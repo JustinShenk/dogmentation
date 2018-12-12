@@ -216,22 +216,23 @@ def overlay_mask(img_path: str, mask: Image):
 
 
 
-def test_model(data, model_filename):
+def test_model(data, model_filename, is_bgr):
     """Test model at `model_filename` on encoded_images in `data`."""
     # Data is list of {'image': encoded_image}
     model_path = to_uploads(model_filename)
-    import ipdb;ipdb.set_trace()
+
 
     test_images = [decode_image(x['image']) for x in data['rows']]
     test_images = np.stack(map(np.array, test_images))
     test_images = test_images.astype(np.float32) / 255
-    test_images = test_images[..., ::-1]  # BGR
+    if is_bgr:
+        test_images = test_images[..., ::-1]  # BGR
 
     # Get 0-1 scaled predictions
 
     with multiprocessing.Pool() as pool:
         predictions = pool.starmap(model_inference, [(model_path, test_images)])[0]
-    import ipdb; ipdb.set_trace()
+
     results = [{'mask': encode_image(Image.fromarray((mask * 255).astype('uint8').reshape(128, 128))) for mask in
                 predictions}]
     return results
@@ -249,7 +250,7 @@ def model_inference(model_path, test_images):
     return predictions
 
 
-def evaluate_test_dataset(url, authorization, model_filename):
+def evaluate_test_dataset(url, authorization, model_filename, is_bgr):
     """Return list `rows` with responses for test `dataset`."""
     dataset['encoded'] = dataset[DATASET_IMAGE_COLUMN].apply(encode_image)
 
@@ -267,7 +268,7 @@ def evaluate_test_dataset(url, authorization, model_filename):
         ]}
 
         if model_filename is not '':
-            results = test_model(data, model_filename)
+            results = test_model(data, model_filename, is_bgr)
             rows.extend(results)
         else:
             app.logger.debug(f"Sending request to {url}")
@@ -366,14 +367,14 @@ def index():
         auth = token_to_auth(request.form['token'])
         field_in = request.form['field_in'] or 'image'
         field_out = request.form['field_out'] or 'mask'
+        is_bgr = request.form.get('bgr_check')
         file = request.files.get('model_file')
         if file and allowed_file(file.filename):
             model_filename = str(uuid.uuid4())[:8] + secure_filename(file.filename)
             file.save(to_uploads(model_filename))
             url = model_filename # HACK
         # out_img_filename = find_dogs(url, auth, var_name, debug=True)
-        # import ipdb;ipdb.set_trace()
-        test_results_list = evaluate_test_dataset(url, auth, model_filename=model_filename)
+        test_results_list = evaluate_test_dataset(url, auth, model_filename=model_filename, is_bgr=is_bgr)
 
         out_img_filename = get_sample_overlay(test_results_list)
 
@@ -395,7 +396,10 @@ def index():
                 df = pd.read_csv(filename)
                 df = df.append(pd.DataFrame(data, columns=[*data]))
             else:
+                data['iou'] = compute_iou(test_results_list, field_out)
+                data['out_img'] = out_img_filename
                 df = pd.DataFrame(data, columns=[*data])
+
 
             # Overwrite csv
             df.to_csv(filename,index=False)
