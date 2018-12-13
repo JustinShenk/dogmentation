@@ -223,9 +223,6 @@ def overlay_mask(img_path: str, mask):
         mask = decode_image(mask)
     mask = mask.convert("RGBA")
     overlayed_img = Image.blend(img, mask, alpha=.5)
-
-
-
     return overlayed_img
 
 
@@ -272,6 +269,7 @@ def evaluate_test_dataset(url, authorization, model_filename, is_bgr):
     """Return list of encoded images `rows` with responses for test `dataset`."""
     dataset['encoded'] = dataset[DATASET_IMAGE_COLUMN].apply(encode_image)
 
+    # Load default URL/Token if none provided
     if 'http' not in url:
         url = URL
     if len(authorization) < 10:
@@ -307,6 +305,7 @@ def encode_image(image: Image):
 
 
 def decode_image(data_uri: str):
+    """Convert `data_uri` to PIL Image."""
     format_str, image_str = data_uri.split(',', 1)
     if format_str != 'data:image/png;base64':
         raise ValueError('Format not supported')
@@ -412,7 +411,7 @@ def index():
         name = request.form['name']
         if name is '':
             name = 'Anonymous'
-        email = request.form['email'].lower()
+        email = request.form.get('email','').lower()
         try:
             url = request.form['url']
             auth = token_to_auth(request.form['token'])
