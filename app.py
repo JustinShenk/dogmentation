@@ -14,12 +14,10 @@ matplotlib.use('Agg')
 
 import io
 import json
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import os
 import requests
-import seaborn as sns
 import shutil
 import tempfile
 
@@ -51,8 +49,6 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 400 * 1024 * 1024  # 30 MB limit
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-sns.set()
-
 DATASET_PATH = 'dogmentation_val.zip'
 DATASET_IMAGE_COLUMN = 'image'
 DATASET_MASK_COLUMN = 'mask'
@@ -62,6 +58,7 @@ AUTHORIZATION = app.config.get('AUTHORIZATION')
 URL = app.config.get('URL')
 FIELD = 'mask'
 
+# Read dataset
 with zipfile.ZipFile(DATASET_PATH, 'r') as z:
     index_file = z.open('index.csv')
     dataset = pd.read_csv(index_file)[:BATCH_SIZE]
@@ -72,6 +69,7 @@ with zipfile.ZipFile(DATASET_PATH, 'r') as z:
 
 
 def to_uploads(filename):
+    """Local path in Flask instance upload directory."""
     return os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
 
