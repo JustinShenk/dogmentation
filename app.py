@@ -61,7 +61,7 @@ FIELD = 'mask'
 # Read dataset
 with zipfile.ZipFile(DATASET_PATH, 'r') as z:
     index_file = z.open('index.csv')
-    dataset = pd.read_csv(index_file)[:120]
+    dataset = pd.read_csv(index_file)
     dataset[DATASET_IMAGE_COLUMN] = dataset[DATASET_IMAGE_COLUMN].apply(
         lambda path: Image.open(z.open(path)))
     dataset[DATASET_MASK_COLUMN] = dataset[DATASET_MASK_COLUMN].apply(
