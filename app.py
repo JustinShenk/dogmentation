@@ -52,7 +52,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 DATASET_PATH = 'dogmentation_val.zip'
 DATASET_IMAGE_COLUMN = 'image'
 DATASET_MASK_COLUMN = 'mask'
-BATCH_SIZE = 30
+BATCH_SIZE = 8
 
 AUTHORIZATION = app.config.get('AUTHORIZATION')
 URL = app.config.get('URL')
@@ -61,7 +61,7 @@ FIELD = 'mask'
 # Read dataset
 with zipfile.ZipFile(DATASET_PATH, 'r') as z:
     index_file = z.open('index.csv')
-    dataset = pd.read_csv(index_file)[:BATCH_SIZE]
+    dataset = pd.read_csv(index_file)[:120]
     dataset[DATASET_IMAGE_COLUMN] = dataset[DATASET_IMAGE_COLUMN].apply(
         lambda path: Image.open(z.open(path)))
     dataset[DATASET_MASK_COLUMN] = dataset[DATASET_MASK_COLUMN].apply(
@@ -240,8 +240,7 @@ def test_model(data, model_filename, is_bgr):
     if is_bgr:
         test_images = test_images[..., ::-1]  # BGR
 
-    # Get 0-1 scaled predictions
-
+    # Get scaled predictions
     with multiprocessing.Pool() as pool:
         predictions = pool.starmap(model_inference,
                                    [(model_path, test_images)])[0]
@@ -477,6 +476,10 @@ def index():
 
     return render_template('index.html', form=form, results=results)
 
+@app.route('/validation', methods=['GET'])
+def validation():
+    results = pd.read_csv('validation.csv')
+    return render_template('validation.html', results=results)
 
 def to_records(df, sortby=None):
     """Output `df` as dict-like `records` sorted by `sortby`."""

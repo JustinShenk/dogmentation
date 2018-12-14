@@ -6,5 +6,5 @@ pandas
 seaborn
 numpy
 requests
-fer
 Pillow
+tf-nightly
