@@ -472,7 +472,6 @@ def index():
             app.logger.error("File not found")
         except TypeError:
             pass
-    print(results)
 
     return render_template('index.html', form=form, results=results)
 
